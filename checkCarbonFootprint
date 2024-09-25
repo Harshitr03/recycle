@@ -1,0 +1,46 @@
+//js code for calculation on C02 emmision
+function checkCarbonFootprint() {
+    
+    let item = prompt("Enter the item").toLowerCase();
+
+    
+    if (item === "plastic bottle") {
+        console.log("Recycling a plastic bottle reduces 0.15kg of Co2 emissions, If you recycle one ton of plastic bottles, you could save about 1-1.5 tons of CO₂ equivalent emissions.");
+        let kg_size = parseFloat(prompt("Enter the weight (in kg)"));
+        console.log("Amount of reduced CO2 emission:", (kg_size * 1.25).toFixed(2), "kg");
+    } 
+    else if(item == "plastic bags") {
+        console.log("Recycling one ton of plastic bags can save approximately 1.3 to 1.5 tons of CO₂ emissions, Recycling plastic bags generally results in a 40-60% reduction in carbon emissions.");
+        let kg_size = parseFloat(prompt("Enter the weight (in kg)"));
+        console.log("Amount of reduced CO2 emission:", (kg_size * 1.4).toFixed(2), "kg");
+    }
+    else if (item == "metal cans"){
+        console.log("Recycling one ton of plastic bags saves approximately 1.3 to 1.5 tons of CO₂ emissions, made from high-density polyethylene (HDPE). Recycling plastic bags can lead to a 40-60% reduction in carbon emissions.");
+        let kg_size = parseFloat(prompt("Enter the weight (in kg)"));
+        console.log("Amount of reduced CO2 emission:", (kg_size * 1.4).toFixed(2), "kg");
+    }
+    else if (item == "ewaste"){
+        console.log("Recycling one metric ton of circuit boards can save 2 tons of CO₂ emissions, according to the Environmental Protection Agency (EPA)​((ALPHA Blog).");
+        let kg_size = parseFloat(prompt("Enter the weight (in kg)"));
+        console.log("Amount of reduced CO2 emission:", (kg_size * 2).toFixed(2), "kg");
+    
+    }
+    else if(item =="wood waste"){
+        console.log("biodegradable");
+    }
+    else if(item == "paper waste"){
+        console.log("biodegradable");
+    }
+    else if(item == "leaf waste"){
+        console.log("biodegradable");
+    }
+    else if (item == "food waste"){
+        console.log("biodegradable");
+    }
+    else{
+        console.log("Enter from the 8 valid inputs");
+    }
+}
+
+// Call the function to execute the code
+checkCarbonFootprint();

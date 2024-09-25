@@ -77,7 +77,6 @@ app.post('/', async (req, res) => {
             },
           ],
         });
-        console.log(response.choices[0].message);
         res.send(response.choices[0].message);
       }
     openimage(image);

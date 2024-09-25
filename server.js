@@ -5,6 +5,19 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const fs = require('fs');
 const path = require('path');
+const session = require('express-session');
+const passport = require('passport');
+const LocalStrategy = require('passport-local');
+const mongoose=require('mongoose');
+// const User = require('./models/users');
+
+mongoose.connect('mongodb://127.0.0.1:27017/recycle-app')
+  .then(() => {
+    console.log("MONGO CONNECTION SECURED");
+  })
+  .catch(err => {
+    console.log("MONGO ERROR");
+  })
 
 const googleapi = process.env.GOOGLE_MAPS_API_KEY;
 const port = process.env.PORT || 8080;
@@ -13,8 +26,30 @@ const openai = new OpenAI({
   organization: "org-qXdkGKXlA6I537SSDYIsjT8r",
   project: "proj_DxJuHPYTOOkekVu6d0x88w1T"
 });
-
 const app = express();
+
+app.use(express.urlencoded({ extended: true }));
+
+const sessionConfig = {
+  secret: 'thisshouldbeabettersecret',
+  resave: false,
+  saveUninitialized: true,
+  cookie: {
+    httpOnly: true,
+    expires: Date.now() + 1000 * 60 * 60 * 24 * 7,
+    maxAge: 1000 * 60 * 60 * 24 * 7
+  }
+}
+app.use(session(sessionConfig));
+
+app.use(passport.initialize());
+app.use(passport.session());
+// passport.use(new LocalStrategy(User.authenticate()));
+// passport.serializeUser(User.serializeUser());
+// passport.deserializeUser(User.deserializeUser());
+
+
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -63,7 +98,6 @@ app.get('/Map', async (req, res) => {
             loc=resloc.results[0].address_components[i].long_name;
         }
     }
-    console.log(loc)
   try {
     const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=recycling%20centers%20in%20${loc}&key=${googleapi}`);
     const data = await response.json();
@@ -74,6 +108,35 @@ app.get('/Map', async (req, res) => {
   }
 });
 
+app.post('/register', async (req, res) => {
+    try {
+      const { username, password, emailid } = req.body;
+      const user = new User({ username, emailid });
+      const registeredUser = await User.register(user, password); //makes the salt and hash for the 'user' and saves it in the database
+      req.login(registeredUser, err => {
+        if (err) {
+          next(err);
+        } else {
+          // res.redirect('/campgrounds');
+        }
+      })
+    } catch (e) {
+      // res.redirect('/register');
+    }
+  })
+  
+  app.post('/login', passport.authenticate('local', { failureRedirect: '/patient/login' }), (req, res) => {
+    // res.redirect(/patient/${req.user._id});
+  })
+  
+  app.get('/logout', (req, res, next) => {
+    req.logout(function (err) {
+      if (err) {
+        return next(err);
+      }
+      // res.redirect('/campgrounds');
+    });
+  })
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });

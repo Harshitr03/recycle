@@ -8,15 +8,15 @@ const path = require('path');
 const session = require('express-session');
 const passport = require('passport');
 const LocalStrategy = require('passport-local');
-const mongoose=require('mongoose');
-// const User = require('./models/users');
+const mongoose = require('mongoose');
+const User = require('./models/users');
 
 mongoose.connect('mongodb://127.0.0.1:27017/recycle-app')
   .then(() => {
     console.log("MONGO CONNECTION SECURED");
   })
   .catch(err => {
-    console.log("MONGO ERROR");
+    console.log(err);
   })
 
 const googleapi = process.env.GOOGLE_MAPS_API_KEY;
@@ -44,9 +44,9 @@ app.use(session(sessionConfig));
 
 app.use(passport.initialize());
 app.use(passport.session());
-// passport.use(new LocalStrategy(User.authenticate()));
-// passport.serializeUser(User.serializeUser());
-// passport.deserializeUser(User.deserializeUser());
+passport.use(new LocalStrategy(User.authenticate()));
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
 
 
 
@@ -56,50 +56,51 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 
 app.post('/', async (req, res) => {
-  const { image } = req.body;  
+  const { image } = req.body;
   if (image) {
     async function openimage(url) {
-        const response = await openai.chat.completions.create({
-          model: "gpt-4o",
-          messages: [
-            {
-              role: "user",
-              content: [
-                { type: "text", text: "What's in this image?" },
-                {
-                  type: "image_url",
-                  image_url: {
-                    "url": `${url}`,
-                    "detail": "high"
-                  },
-                }
-              ],
-            },
-          ],
-        });
-        res.send(response.choices[0].message);
-      }
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "What's in this image?" },
+              {
+                type: "image_url",
+                image_url: {
+                  "url": `${url}`,
+                  "detail": "high"
+                },
+              }
+            ],
+          },
+        ],
+      });
+      res.send(response.choices[0].message);
+    }
     openimage(image);
-     
+
   } else {
     res.status(400).json({ error: 'No image provided' });
   }
 });
 
 app.get('/Map', async (req, res) => {
-    const lat=req.query.lat;
-    const lon=req.query.lon;
-    const location=  await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${googleapi}`);
-    const resloc = await location.json();
-    var loc;
-    for(let i=0;i<resloc.results[0].address_components.length;i++){
-        if(resloc.results[0].address_components[i].types[1]=='administrative_area_level_3'){
-            loc=resloc.results[0].address_components[i].long_name;
-        }
+  const lat = req.query.lat;
+  const lon = req.query.lon;
+  const location = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${googleapi}`);
+  const resloc = await location.json();
+  var loc;
+  for (let i = 0; i < resloc.results[0].address_components.length; i++) {
+    if (resloc.results[0].address_components[i].types[1] == 'administrative_area_level_3') {
+      loc = resloc.results[0].address_components[i].long_name;
     }
+  }
   try {
     const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=recycling%20centers%20in%20${loc}&key=${googleapi}`);
     const data = await response.json();
+    console.log(data);
     res.json(data);
   } catch (error) {
     console.error("Error fetching from Google API:", error);
@@ -107,35 +108,45 @@ app.get('/Map', async (req, res) => {
   }
 });
 
-app.post('/register', async (req, res) => {
-    try {
-      const { username, password, emailid } = req.body;
-      const user = new User({ username, emailid });
-      const registeredUser = await User.register(user, password); //makes the salt and hash for the 'user' and saves it in the database
-      req.login(registeredUser, err => {
-        if (err) {
-          next(err);
-        } else {
-          // res.redirect('/campgrounds');
-        }
-      })
-    } catch (e) {
-      // res.redirect('/register');
-    }
-  })
-  
-  app.post('/login', passport.authenticate('local', { failureRedirect: '/patient/login' }), (req, res) => {
-    // res.redirect(/patient/${req.user._id});
-  })
-  
-  app.get('/logout', (req, res, next) => {
-    req.logout(function (err) {
+app.post('/register', async (req, res, next) => {
+  try {
+    const { username, password, emailid } = req.body;
+    console.log(req.body);
+    // Create a new user object (without the password)
+    const user = new User({ username, emailid });
+
+    // Register the user with passport-local-mongoose (automatically hashes the password)
+    const registeredUser = await User.register(user, password);
+
+    // Automatically log in the user after successful registration
+    req.login(registeredUser, (err) => {
       if (err) {
-        return next(err);
+        return next(err); // Pass the error to the error handler
       }
-      // res.redirect('/campgrounds');
+      console.log("GOOD")
+      // Send a success response back to the frontend
+      res.status(200).json({ message: 'Registration successful', username });
     });
-  })
+  } catch (e) {
+    console.log("WORST")
+    // Handle registration errors (like duplicate users, validation errors, etc.)
+    res.status(400).json({ error: e.message });
+  }
+});
+
+
+app.post('/login', passport.authenticate('local', { failureRedirect: '/patient/login' }), (req, res) => {
+  // res.redirect(/patient/${req.user._id});
+})
+
+app.get('/logout', (req, res, next) => {
+  req.logout(function (err) {
+    if (err) {
+      return next(err);
+    }
+    // res.redirect('/campgrounds');
+  });
+})
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });

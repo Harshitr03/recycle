@@ -57,6 +57,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/', async (req, res) => {
   const { image } = req.body;
+  const lat = req.body.lat;
+  const lon = req.body.lon;
+  var chat;
   if (image) {
     async function openimage(url) {
       const response = await openai.chat.completions.create({
@@ -77,18 +80,13 @@ app.post('/', async (req, res) => {
           },
         ],
       });
-      res.send(response.choices[0].message);
+      return await response.choices[0].message;
     }
-    openimage(image);
-
+    chat=await openimage(image);
   } else {
     res.status(400).json({ error: 'No image provided' });
   }
-});
-
-app.get('/Map', async (req, res) => {
-  const lat = req.query.lat;
-  const lon = req.query.lon;
+  var loc;
   const location = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${googleapi}`);
   const resloc = await location.json();
   var loc;
@@ -100,13 +98,15 @@ app.get('/Map', async (req, res) => {
   try {
     const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=recycling%20centers%20in%20${loc}&key=${googleapi}`);
     const data = await response.json();
-    console.log(data);
-    res.json(data);
+    loc=data;
   } catch (error) {
     console.error("Error fetching from Google API:", error);
     res.status(500).json({ error: 'Error fetching Google API data' });
   }
+  res.send({chat:chat,loc:loc});
 });
+
+
 
 app.post('/register', async (req, res, next) => {
   try {

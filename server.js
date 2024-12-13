@@ -11,13 +11,13 @@ const LocalStrategy = require('passport-local');
 const mongoose = require('mongoose');
 const User = require('./models/users');
 
-mongoose.connect('mongodb://127.0.0.1:27017/recycle-app')
-  .then(() => {
-    console.log("MONGO CONNECTION SECURED");
-  })
-  .catch(err => {
-    console.log(err);
-  })
+// mongoose.connect('mongodb://127.0.0.1:27017/recycle-app')
+//   .then(() => {
+//     console.log("MONGO CONNECTION SECURED");
+//   })
+//   .catch(err => {
+//     console.log(err);
+//   })
 
 const googleapi = process.env.GOOGLE_MAPS_API_KEY;
 const port = process.env.PORT || 8080;
@@ -50,7 +50,12 @@ passport.deserializeUser(User.deserializeUser());
 
 
 
-app.use(cors());
+const corsOptions = {
+  origin: 'http://localhost:3000',  // Explicitly allow the React frontend origin
+  credentials: true,                // Allow credentials (cookies, authentication)
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -59,6 +64,15 @@ app.post('/', async (req, res) => {
   const { image } = req.body;
   const lat = req.body.lat;
   const lon = req.body.lon;
+  var loc;
+  const location = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${googleapi}`);
+  const resloc = await location.json();
+  var loc;
+  for (let i = 0; i < resloc.results[0].address_components.length; i++) {
+    if (resloc.results[0].address_components[i].types[1] == 'administrative_area_level_3') {
+      loc = resloc.results[0].address_components[i].long_name;
+    }
+  }
   var chat;
   if (image) {
     async function openimage(url) {
@@ -68,7 +82,7 @@ app.post('/', async (req, res) => {
           {
             role: "user",
             content: [
-              { type: "text", text: "What's in this image?" },
+              { type: "text", text: `Categorise the object(s) in this image according to their recyclbility and reusability, give 1 response for each reusing and recycling as choices[1] and choices[2] the object. in choice[0] give a one word response to show if the object(s) is donatable and if so response for choice[1 and 2] should be for the same .The user lives in ${loc} so also show the promt for respectively.choice[1] and choice[2] should be 100 words each`  },
               {
                 type: "image_url",
                 image_url: {
@@ -80,20 +94,11 @@ app.post('/', async (req, res) => {
           },
         ],
       });
-      return await response.choices[0].message;
+      return await response.choices;
     }
     chat=await openimage(image);
   } else {
     res.status(400).json({ error: 'No image provided' });
-  }
-  var loc;
-  const location = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lon}&key=${googleapi}`);
-  const resloc = await location.json();
-  var loc;
-  for (let i = 0; i < resloc.results[0].address_components.length; i++) {
-    if (resloc.results[0].address_components[i].types[1] == 'administrative_area_level_3') {
-      loc = resloc.results[0].address_components[i].long_name;
-    }
   }
   try {
     const response = await fetch(`https://maps.googleapis.com/maps/api/place/textsearch/json?query=recycling%20centers%20in%20${loc}&key=${googleapi}`);
@@ -107,13 +112,12 @@ app.post('/', async (req, res) => {
 });
 
 
-
 app.post('/register', async (req, res, next) => {
   try {
-    const { username, password, emailid } = req.body;
+    const { username, password, email } = req.body;
     console.log(req.body);
     // Create a new user object (without the password)
-    const user = new User({ username, emailid });
+    const user = new User({ username, email });
 
     // Register the user with passport-local-mongoose (automatically hashes the password)
     const registeredUser = await User.register(user, password);
@@ -123,19 +127,32 @@ app.post('/register', async (req, res, next) => {
       if (err) {
         return next(err); // Pass the error to the error handler
       }
-      console.log("GOOD")
+      
       // Send a success response back to the frontend
       res.status(200).json({ message: 'Registration successful', username });
     });
   } catch (e) {
-    console.log("WORST")
+    
     // Handle registration errors (like duplicate users, validation errors, etc.)
-    res.status(400).json({ error: e.message });
+    res.status(400).json({ error: e.message });
+  }
+});
+
+app.get('/auth/check', (req, res) => {
+  console.log("Is authenticated:", req.isAuthenticated(), "User:", req.user);
+  if (req.isAuthenticated()) {
+    res.status(200).json({ isAuthenticated: true, username: req.user.username });
+    console.log("Session data:", req.session);
+  } else {
+    console.log("Session data:", req.session);
+    res.status(200).json({ isAuthenticated: false });
   }
 });
 
-
 app.post('/login', passport.authenticate('local', { failureRedirect: '/patient/login' }), (req, res) => {
+  console.log("Logged in", req.user);
+  console.log("Session data after login:", req.session);
+  res.status(200).json({ message: 'Login successful', username: req.user.username });
   // res.redirect(/patient/${req.user._id});
 })
 
